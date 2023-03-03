@@ -18,7 +18,7 @@ is [`src/Challenge.huff`](src/Challenge.huff).
 
 1. Install the Huff compiler using `curl -L get.huff.sh | bash`
 2. Clone this repo using `git clone git@github.com:Philogy/jessys-sussy-huff.git`
-3. Pull the dependencies using `git submodule init --recursive`
+3. Pull the dependencies using `git submodule update --init --recursive`
 4. Run your exploit using `forge test -vvv --ffi --match-path test/HackHere.t.sol`
 
 ## Explanation
