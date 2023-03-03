@@ -10,9 +10,10 @@ some syntatic sugar like jump-labels and macros to improve the devs experience.
 ## Goal
 
 To solve this CTF you must steal the tokens from the DEX. To do this go to
-[`./test/HackHere.t.sol`](test/HackHere.t.sol) and your logic to the `_executeSolution` method.
+[`./test/HackHere.t.sol`](test/HackHere.t.sol) and add your exploit logic to the `_executeSolution` method.
 You'll know you've solved the challenge if the `testSolve` test passes. The vulnerable Huff contract
-is [`src/Challenge.huff`](src/Challenge.huff).
+is [`src/Challenge.huff`](src/Challenge.huff). You may deploy and operate your own contracts but do
+not use any cheatcodes!
 
 ## Setup
 
