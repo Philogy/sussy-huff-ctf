@@ -5,7 +5,7 @@ Huff. If you're not familiar with Huff, Huff is a low-level EVM language whereby
 written in the "word" mnemonic form, you can find the full list [here](https://evm.codes). Huff adds
 some syntatic sugar like jump-labels and macros to improve the devs experience.
 
-**Note:** This code has an explicitly added vulnerability, do not use in production!
+**Disclaimer:** This code has an explicitly added vulnerability, do not use in production!
 
 ## Goal
 
@@ -27,3 +27,5 @@ The DEX allows people to create orders trading ETH for MOCK tokens. Orders are c
 `addTo{Eth/Token}Order`. Orders are matched using the `matchEthOrder` function whereby the buyer,
 seller and the price has to be passed in. The party who receives ETH needs to have sufficient tokens
 deposited to fill the order otherwise the function will revert.
+
+> Note: The stack comments are correct and not meant to trick you.
