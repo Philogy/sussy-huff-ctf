@@ -3,15 +3,12 @@
 #define constant ETH_ORDERS_SLOT = 0xd1fbdc8f650c8476dd885e51e1c81c5825ca8924d44606e49aac1037492a123d
 // keccak256("MINI-CTF2811610.SLOT.ERC20")
 #define constant TOKEN_ORDERS_SLOT = 0x52cfa636092f712b3c21ef98bcd41f3ce3b718ddf8ed6b59941f6461095ea7b3
-#define constant LOCK_SLOT = 0x234
 
 
 // Expects non-reentering ERC20 (no ERC777) that also reverts upon failure
 // Will be replaced with actual token address at deploy time.
 #define constant TOKEN = 0xbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
 #define constant WAD = 0xde0b6b3a7640000
-#define constant UNLOCKED = 0x1
-#define constant LOCKED = 0x2
 
 // External ABI
 #define function transferFrom(address, address, uint256) nonpayable returns (bool)
@@ -31,20 +28,6 @@
     not_zero jumpi
         <zero> <zero> revert
     not_zero:
-}
-
-#define macro REQUIRE_NO_LOCK(zero) = takes(0) returns(0) {
-    [LOCK_SLOT] sload [UNLOCKED] eq
-    REQUIRE_NON_ZERO(<zero>)
-}
-
-#define macro LOCK(zero) = takes(0) returns(0) {
-    REQUIRE_NO_LOCK(<zero>)
-    [LOCKED] [LOCK_SLOT] sstore
-}
-
-#define macro UNLOCK() = takes(0) returns(0) {
-    [UNLOCKED] [LOCK_SLOT] sstore
 }
 
 #define macro RCALL(zero) = takes(6) returns(0) {
@@ -220,10 +203,6 @@
     insufficient_tokens:
         <zero> <zero> revert
 
-}
-
-#define macro CONSTRUCTOR() = takes(0) returns(0) {
-    [UNLOCKED] [LOCK_SLOT] sstore
 }
 
 #define macro MAIN() = takes(0) returns(0) {
