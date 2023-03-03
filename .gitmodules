@@ -10,3 +10,6 @@
 	path = lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
 	branch = v4.8.2
+[submodule "lib/smol-huff-deployer"]
+	path = lib/smol-huff-deployer
+	url = https://github.com/philogy/smol-huff-deployer
