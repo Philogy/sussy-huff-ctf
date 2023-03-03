@@ -1,4 +1,4 @@
-# Jessy's Sussy Huff
+# Sussy Huff CTF
 
 Welcome to this CTF challenge. I wrote a pretty efficient but simple on-chain order-book DEX using
 Huff. If you're not familiar with Huff, Huff is a low-level EVM language whereby instructions are
