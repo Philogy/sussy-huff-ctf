@@ -1,0 +1,265 @@
+// Random hashes used to prevent accidental collision with normal layout.
+// keccak256("MINI-CTF2811610.SLOT.ETH")
+#define constant ETH_ORDERS_SLOT = 0xd1fbdc8f650c8476dd885e51e1c81c5825ca8924d44606e49aac1037492a123d
+// keccak256("MINI-CTF2811610.SLOT.ERC20")
+#define constant TOKEN_ORDERS_SLOT = 0x52cfa636092f712b3c21ef98bcd41f3ce3b718ddf8ed6b59941f6461095ea7b3
+#define constant LOCK_SLOT = 0x234
+
+
+// Expects non-reentering ERC20 (no ERC777) that also reverts upon failure
+// Will be replaced with actual token address at deploy time.
+#define constant TOKEN = 0xbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
+#define constant WAD = 0xde0b6b3a7640000
+#define constant UNLOCKED = 0x1
+#define constant LOCKED = 0x2
+
+// External ABI
+#define function transferFrom(address, address, uint256) nonpayable returns (bool)
+#define function transfer(address, uint256) nonpayable returns (bool)
+
+// Actual ABI
+#define function addToEthOrder(uint256 price) payable returns ()
+#define function refundEthOrder(uint256 price) nonpayable returns ()
+#define function addToTokenOrder(uint256 price, uint256 amount) nonpayable returns ()
+#define function refundTokenOrder(uint256 price) nonpayable returns ()
+#define function getEthOrder(address user, uint256 price) view returns (uint256)
+#define function getTokenOrder(address user, uint256 price) view returns (uint256)
+#define function matchEthOrder(address ethSeller, address ethBuyer, uint256 price) nonpayable returns ()
+
+#define macro REQUIRE_NON_ZERO(zero) = takes(1) returns(0) {
+    // takes:           [value]
+    not_zero jumpi
+        <zero> <zero> revert
+    not_zero:
+}
+
+#define macro REQUIRE_NO_LOCK(zero) = takes(0) returns(0) {
+    [LOCK_SLOT] sload [UNLOCKED] eq
+    REQUIRE_NON_ZERO(<zero>)
+}
+
+#define macro LOCK(zero) = takes(0) returns(0) {
+    REQUIRE_NO_LOCK(<zero>)
+    [LOCKED] [LOCK_SLOT] sstore
+}
+
+#define macro UNLOCK() = takes(0) returns(0) {
+    [UNLOCKED] [LOCK_SLOT] sstore
+}
+
+#define macro RCALL(zero) = takes(6) returns(0) {
+    // takes:         [address, value, argOffset, argLength, retOffset, retLength]
+    gas call
+    REQUIRE_NON_ZERO(<zero>)
+}
+
+#define macro SEND_ETH(zero) = takes(1) returns(0) {
+    // takes:                      [amount]
+    <zero> <zero> <zero> <zero> // [0, 0, 0, 0, amount]
+    swap4 caller                // [msg.sender, amount, 0, 0, 0, 0]
+    RCALL(<zero>)               // []
+}
+
+
+#define macro ADD_TO_ETH_ORDER(zero) = takes(0) returns(0) {
+    // Setup storage slot deriv values in memory.
+    [ETH_ORDERS_SLOT] msize mstore
+    caller            msize mstore
+    0x04 calldataload msize mstore
+    msize <zero> sha3 // [order_slot]
+    dup1 sload        // [order_amount, order_slot]
+    callvalue add     // [order_amount', order_slot]
+    swap1 sstore      // []
+    stop
+}
+
+#define macro REFUND_ETH_ORDER(zero) = takes(0) returns(0) {
+    [ETH_ORDERS_SLOT] msize mstore
+    caller            msize mstore
+    0x04 calldataload msize mstore
+    msize <zero> sha3 // [order_slot]
+    <zero>            // [0, order_slot]
+    dup2 sload        // [order_amount, 0, order_slot]
+    swap2 sstore      // [order_amount]
+    // Send ETH at end following CEI, no reentrancy for you ;)
+    SEND_ETH(<zero>)  // []
+    stop
+}
+
+#define macro ADD_TO_TOKEN_ORDER(zero) = takes(0) returns(0) {
+    // -- Do `transferFrom(msg.sender, address(this), amount)`
+    0x24 calldataload        // [amount]
+    __FUNC_SIG(transferFrom) // [transferFrom.selector, amount]
+    msize mstore             // [amount]
+    caller  msize mstore     // [amount]
+    address msize mstore     // [amount]
+    dup1    msize mstore     // [amount]
+    <zero> <zero> 0x64 0x1c  // [0x1c, 0x64, 0, 0, amount]
+    <zero> [TOKEN]           // [token, 0, 0x1c, 0x64, 0, 0, amount]
+    RCALL(<zero>)            // [amount]
+
+    // -- Save amount (msize already used so have to push memory constants)
+    0x04 calldataload   0x40 mstore
+    caller              0x20 mstore
+    [TOKEN_ORDERS_SLOT] 0x00 mstore
+    0x60 0x00 sha3           // [order_slot, amount]
+    dup1 sload               // [order_amount, order_slot, amount]
+    // Cheaper to DUP than swap twice. Expect reasonable token supply to avoid overflow.
+    dup3 add                 // [order_amount', order_slot, amount]
+    swap1 sstore             // [amount]
+
+    stop
+}
+
+#define macro REFUND_TOKEN_ORDER(zero) = takes(0) returns(0) {
+    [TOKEN_ORDERS_SLOT] msize mstore
+    caller              msize mstore
+    0x04 calldataload   msize mstore
+    msize <zero> sha3 // [order_slot]
+    <zero>            // [0, order_slot]
+    dup2 sload        // [order_amount, 0, order_slot]
+    swap2 sstore      // [order_amount]
+
+    // Send tokens using `transfer(msg.sender, order_amount)`.
+                         0x40 mstore
+    caller               0x20 mstore
+    __FUNC_SIG(transfer) 0x00 mstore
+    <zero> <zero>    // [0, 0]
+    0x44 0x1c <zero> // [0, 0x1c, 0x44, 0, 0]
+    [TOKEN]          // [token, 0, 0x1c, 0x44, 0, 0]
+    RCALL(<zero>)    // []
+
+    stop
+}
+
+#define macro RETURN_ORDER(zero) = takes(1) returns(0) {
+    // takes:            [slot_constant]
+    /*    slot     */ msize mstore
+    0x04 calldataload msize mstore
+    0x24 calldataload msize mstore
+    msize <zero> sha3 // [order_slot]
+    sload             // [order_amount]
+    <zero> mstore     // []
+    0x20 <zero> return
+}
+
+#define macro GET_ETH_ORDER(zero) = takes(0) returns(0) {
+    [ETH_ORDERS_SLOT]
+    RETURN_ORDER(<zero>)
+}
+
+#define macro GET_TOKEN_ORDER(zero) = takes(0) returns(0) {
+    [TOKEN_ORDERS_SLOT]
+    RETURN_ORDER(<zero>)
+}
+
+/// @notice Multiplies two numbers and reverts on overflow
+/// @dev Taken from Huffmate
+#define macro SAFE_MUL(zero) = takes (2) returns (1) {
+    // takes:                      [x, y]
+    dup1 iszero x_zero jumpi
+        dup2 dup2 mul           // [x * y, x, y]
+        swap2 swap1             // [x, y, x * y]
+        dup3                    // [x * y, x, y, x * y]
+        div eq safe_mul_end jumpi
+        <zero> <zero> revert
+    x_zero:
+        pop pop 0x0
+    safe_mul_end:
+}
+
+#define macro MATCH_ORDER(zero) = takes(0) returns(0) {
+    0x04 calldataload  // [seller]
+    0x24 calldataload  // [buyer, seller]
+    0x44 calldataload  // [price, buyer, seller]
+
+    // -- Get seller order slot
+    [ETH_ORDERS_SLOT] msize mstore
+    dup3              msize mstore
+    dup1              msize mstore
+    msize <zero> sha3  // [seller.order_slot, price, buyer, seller]
+
+    // -- Load order amount and reset to prevent reentrancy vuln.
+    <zero> dup2 sload  // [eth_sell_amount, 0, seller.order_slot, price, buyer, seller]
+    swap2              // [seller.order_slot, 0, eth_sell_amount, price, buyer, seller]
+    sstore             // [eth_sell_amount, price, buyer, seller]
+
+    // -- Send ETH before tokens deducted, can allow for flash swap.
+    <zero> <zero>     // [0, 0, eth_sell_amount, price, buyer, seller]
+    <zero> <zero>     // [0, 0, 0, 0, eth_sell_amount, price, buyer, seller]
+    dup5 dup8         // [buyer, eth_sell_amount, 0, 0, 0, 0, eth_sell_amount, price, buyer, seller]
+    RCALL(<zero>)     // [eth_sell_amount, price, buyer, seller]
+
+    // -- Check whether buyer has sufficient tokens
+    dup2                0x40 mstore
+    dup3                0x20 mstore
+    [TOKEN_ORDERS_SLOT] 0x00 mstore
+    0x60 0x00 sha3    // [buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    dup1 sload        // [buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    [WAD]             // [WAD, buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    dup5 dup5         // [eth_sell_amount, price, WAD, buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    SAFE_MUL(<zero>)  // [eth_sell_amount * price, WAD, buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    div               // [required_tokens, buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    dup1 dup3         // [buyer_token_amount, required_tokens, required_tokens, buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    // If insufficient tokens, revert.
+    lt insufficient_tokens jumpi
+    //                   [required_tokens, buyer_token_amount, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    // -- Update buyer's balance.
+    dup1 swap2        // [buyer_token_amount, required_tokens, required_tokens, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    sub               // [buyer_order_amount', required_tokens, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    dup3 sstore       // [required_tokens, buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    // -- Send buyer tokens.
+    0x40 mstore       // [buyer_order_slot, eth_sell_amount, price, buyer, seller]
+    __FUNC_SIG(transfer) <zero> mstore
+    swap4 0x20 mstore // [eth_sell_amount, price, buyer, buyer_order_slot]
+    0x0 0x0 0x44 0x1c // [0x1c, 0x44, 0, 0, eth_sell_amount, price, buyer_order_slot, seller]
+    0x0 [TOKEN]       // [token, 0, 0x1c, 0x44, 0, 0, eth_sell_amount, price, buyer_order_slot, seller]
+    RCALL(<zero>)     // [eth_sell_amount, price, buyer_order_slot, seller]
+
+    stop
+    insufficient_tokens:
+        <zero> <zero> revert
+
+}
+
+#define macro CONSTRUCTOR() = takes(0) returns(0) {
+    [UNLOCKED] [LOCK_SLOT] sstore
+}
+
+#define macro MAIN() = takes(0) returns(0) {
+    // Common optimization,
+    // uses `RETURNDATASIZE` as cheap "push 0" op costing 2 gas (`PUSH1 0x0` costs 3 gas)
+    _MAIN(returndatasize)
+}
+
+#define macro _MAIN(zero) = takes(0) returns(0) {
+    // get selector onto stack
+    pc calldataload 0xe0 shr          // [selector]
+    callvalue payable_methods jumpi
+    // non-payable methods
+        dup1 __FUNC_SIG(refundEthOrder)   eq dest_refundEthOrder   jumpi
+        dup1 __FUNC_SIG(addToTokenOrder)  eq dest_addToTokenOrder  jumpi
+        dup1 __FUNC_SIG(refundTokenOrder) eq dest_refundTokenOrder jumpi
+        dup1 __FUNC_SIG(getEthOrder)      eq dest_getEthOrder      jumpi
+        dup1 __FUNC_SIG(getTokenOrder)    eq dest_getTokenOrder    jumpi
+        dup1 __FUNC_SIG(matchEthOrder)    eq dest_matchEthOrder    jumpi
+        // If no non-payable function matches maybe payalbe with zero value.
+    payable_methods:
+        __FUNC_SIG(addToEthOrder) eq dest_addToEthOrder jumpi
+        <zero> <zero> revert
+
+    dest_refundEthOrder:
+        REFUND_ETH_ORDER(<zero>)
+    dest_addToEthOrder:
+        ADD_TO_ETH_ORDER(<zero>)
+    dest_addToTokenOrder:
+        ADD_TO_TOKEN_ORDER(<zero>)
+    dest_refundTokenOrder:
+        REFUND_TOKEN_ORDER(<zero>)
+    dest_getEthOrder:
+        GET_ETH_ORDER(<zero>)
+    dest_getTokenOrder:
+        GET_TOKEN_ORDER(<zero>)
+    dest_matchEthOrder:
+        MATCH_ORDER(<zero>)
+}
