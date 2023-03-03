@@ -222,7 +222,7 @@
         dup1 __FUNC_SIG(getEthOrder)      eq dest_getEthOrder      jumpi
         dup1 __FUNC_SIG(getTokenOrder)    eq dest_getTokenOrder    jumpi
         dup1 __FUNC_SIG(matchEthOrder)    eq dest_matchEthOrder    jumpi
-        // If no non-payable function matches maybe payalbe with zero value.
+        // If no non-payable function matches maybe payable with zero value.
     payable_methods:
         __FUNC_SIG(addToEthOrder) eq dest_addToEthOrder jumpi
         <zero> <zero> revert
