@@ -26,8 +26,8 @@ contract HackHere is Test {
         // Create deposit to be stolen, give initial balances.
         vm.startPrank(tokenOwner);
         token.approve(address(challenge), type(uint256).max);
-        challenge.addToTokenOrder(0.5e18, 999.0e6);
-        token.transfer(attackerStartAccount, 1.0e6);
+        challenge.addToTokenOrder(0.5e18, 999.0e6 * 1e18);
+        token.transfer(attackerStartAccount, 1.0e6 * 1e18);
         vm.stopPrank();
         vm.deal(attackerStartAccount, 100 ether);
     }
